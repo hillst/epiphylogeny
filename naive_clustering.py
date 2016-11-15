@@ -2,7 +2,7 @@
 from sklearn.preprocessing import Imputer
 from sklearn.decomposition import RandomizedPCA
 from sklearn.cluster import AgglomerativeClustering
-from scipy.cluster.hierarchy import dendrogram, linkage, cophenet
+from scipy.cluster.hierarchy import dendrogram, linkage, cophenet, to_tree
 from scipy.spatial.distance import pdist
 import matplotlib as mlp
 mlp.use('pdf')
@@ -18,10 +18,11 @@ def dimensionality_reduction(data, n=100):
     
     """ 
 
-
     #gotta do these.
     imp = Imputer(missing_values='NaN', strategy='mean', axis=1)
-    data = imp.fit_transform(data.transpose()).transpose()
+    data = data.transpose() 
+    data = imp.fit_transform(data)
+    data = data.transpose()
 
     pca = RandomizedPCA(n_components=n)
     data = pca.fit_transform(data)
@@ -61,13 +62,6 @@ def h_clustering(data, dr=False):
     links = linkage(dists, 'ward')
     return links
 
-def build_newick(clustering_tree):
-    """
-    Converts our heirarchical clustering into a newick tree
-    Get this from dendogram probably.
-    """
-    ()
-    pass
 
 def plot_dendogram(links):
     figure(figsize=(19, 10))
@@ -87,34 +81,68 @@ def permute_data(data):
 
 def read_csv(filename):
     names, site, data = [],[],[]
-    for line in open(filename):
+    lens = set()
+    for i, line in enumerate(open(filename)):
         if "RRBS" in line or "#" in line:
-            names = line.strip().split(",")
+            names = line.strip().split(",")[1:]
         else:
             line_arr = line.strip().split(",")
             site = line_arr[0]
             row = []
             for d in line_arr[1:]:
-                if d == "-":
+                if d == "-" or d == "2":
                     row.append(np.NaN)
                 else:
                     row.append(float(d))
-            data.append(row)
+            if len(row) == 103:
+                print row
+                print i
+            if row.count(np.NaN) < 93:
+                lens.add(len(row))
+                data.append(row)
     data = np.asarray(data) 
+    print lens
     #we need to transpose for the imputer to work correctly, then transpose back for the rest.
     #data = imp.fit_transform(data).transpose()
-    print data
     return names, data #.transpose()
+
+def get_newick(node, newick, parentdist, leaf_names):
+    """
+    http://stackoverflow.com/questions/28222179/save-dendrogram-to-newick-format
+
+    tree = hierarchy.to_tree(Z,False)
+    get_newick(tree, "", tree.dist, leaf_names)
+    """
+    if node.is_leaf():
+        if node.id < len(leaf_names):
+        #return "%s:%.2f%s" % (leaf_names[node.id], parentdist - node.dist, newick)
+            name = leaf_names[node.id]
+        else:
+            name = node.id
+        return "%s:%.2f%s" % (name , parentdist - node.dist, newick)
+    else:
+        if len(newick) > 0:
+            newick = "):%.2f%s" % (parentdist - node.dist, newick)
+        else:
+            newick = ");"
+        newick = get_newick(node.get_left(), newick, node.dist, leaf_names)
+        newick = get_newick(node.get_right(), ",%s" % (newick), node.dist, leaf_names)
+        newick = "(%s" % (newick)
+        return newick
 
 def main():
     names, data = read_csv(sys.argv[1])
     #evaluate_dr(data)
-    print data
-    data, pca = dimensionality_reduction(data, n=5)
-    print data
+    data, pca = dimensionality_reduction(data, n=25)
+    print "clustering"
+    import random
+    print len(data)
+    data = np.asarray(random.sample(data, 10000))
     model = h_clustering(data, dr=True)
-    print model
-    plot_dendogram(model)
+    tree = to_tree(model, False)
+    print get_newick(tree, "", tree.dist, names)
+
+    #plot_dendogram(model)
     #print model.children_
     #print len(names) 
     #print sorted(dict(enumerate(model.children_, model.n_leaves_)).keys())
