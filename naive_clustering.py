@@ -130,6 +130,81 @@ def get_newick(node, newick, parentdist, leaf_names):
         newick = "(%s" % (newick)
         return newick
 
+
+def build_colorful_tree(newick, filename=""):
+    """
+    Note that these will fail if we dont have all the pre-reqs and it is not triival to get them all.
+    This stuff is NOT general purpose.
+    """
+    from ete3 import Tree, TreeStyle, CircleFace, TextFace
+    tree = Tree(newick)
+
+    #setup colors and treestyle
+    ts = TreeStyle()
+    ts.show_leaf_name = True
+    ts.mode = "c"
+    ts.arc_start = -180 # 0 degrees = 3 o'clock
+    ts.force_topology = True
+    ts.arc_span = 360
+
+    face = CircleFace(30, "MediumSeaGreen")
+    face.margin_top = 1000
+    ts.legend.add_face(face, column=0)
+    face = TextFace("Normal B-cell", fsize=64)
+    face.margin_right = 100
+    face.margin_top = 1000
+    ts.legend.add_face(face, column=1)
+
+    ts.legend.add_face(CircleFace(30, "SeaGreen"), column=0)
+    face = TextFace("Normal B CD19pcell", fsize=64)
+    face.margin_right = 100
+    ts.legend.add_face(face, column=1)
+
+    ts.legend.add_face(CircleFace(30, "ForestGreen"), column=0)
+    face = TextFace("Normal B CD19pCD27pcell", fsize=64)
+    face.margin_right = 100
+    ts.legend.add_face(face, column=1)
+
+    ts.legend.add_face(CircleFace(30, "Green"), column=0)
+    face = TextFace("Normal B CD19pCD27mcell", fsize=64)
+    face.margin_right = 100
+    ts.legend.add_face(face, column=1)
+
+    ts.legend.add_face(CircleFace(30, "RoyalBlue"), column=0)
+    face = TextFace("CLL all-batches", fsize=64)
+    face.margin_right = 100
+    ts.legend.add_face(face, column=1)
+
+    #draw tree
+    from ete3 import NodeStyle
+    styles= {}
+    styles["normal_B"] = NodeStyle( bgcolor="MediumSeaGreen", hz_line_color="Black", vt_line_color="Black")
+    styles["NormalBCD19pcell"] = NodeStyle( bgcolor="SeaGreen", hz_line_color="Black", vt_line_color="Black")
+    styles["NormalBCD19pCD27pcell"] = NodeStyle( bgcolor="ForestGreen", hz_line_color="Black", vt_line_color="Black")
+    styles["NormalBCD19pCD27mcell"] = NodeStyle( bgcolor="Green", hz_line_color="Black", vt_line_color="Black")
+    styles["CLL"] = NodeStyle( bgcolor="RoyalBlue", hz_line_color="Black", vt_line_color="Black" )
+
+    for node in tree.traverse("postorder"):
+        #print node.set_style()
+        if len(node.get_leaf_names()) == 1:
+            name = node.get_leaf_names()[0]
+            if "normal_B" in name:
+                node.set_style(styles["normal_B"])
+            elif "NormalBCD19pcell" in name:
+                node.set_style(styles["NormalBCD19pcell"])
+
+            elif "NormalBCD19pCD27pcell" in name:
+                node.set_style(styles["NormalBCD19pCD27pcell"])
+
+            elif "NormalBCD19pCD27mcell" in name:
+                node.set_style(styles["NormalBCD19pCD27mcell"])
+            else:
+                node.set_style(styles["CLL"])
+    #lol
+    tree.render(filename, w=10,dpi=600, units='in',tree_style=ts)
+        
+        
+
 def main():
     names, data = read_csv(sys.argv[1])
     #evaluate_dr(data)
@@ -137,10 +212,13 @@ def main():
     print "clustering"
     import random
     print len(data)
-    data = np.asarray(random.sample(data, 10000))
+    #data = np.asarray(random.sample(data, 10000))
+    data = np.asarray(data)
     model = h_clustering(data, dr=True)
     tree = to_tree(model, False)
-    print get_newick(tree, "", tree.dist, names)
+    nw =  get_newick(tree, "", tree.dist, names)
+    print nw
+    build_colorful_tree(nw) 
 
     #plot_dendogram(model)
     #print model.children_
